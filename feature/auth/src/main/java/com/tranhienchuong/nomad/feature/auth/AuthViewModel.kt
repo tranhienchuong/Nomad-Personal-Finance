@@ -1,9 +1,16 @@
 package com.tranhienchuong.nomad.feature.auth
 
+import android.content.Context
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.userProfileChangeRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -255,6 +262,57 @@ class AuthViewModel : ViewModel() {
                 val message = mapFirebaseError(e.message)
                 _uiState.update { it.copy(isLoading = false, errorMessage = message) }
             }
+        }
+    }
+
+    fun signInWithGoogle(context: Context, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val credentialManager = CredentialManager.create(context)
+                val webClientId = getWebClientId(context)
+
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(webClientId)
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                val result = credentialManager.getCredential(context = context, request = request)
+                val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
+                val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
+
+                val auth = firebaseAuth
+                if (auth != null) {
+                    auth.signInWithCredential(firebaseCredential).await()
+                }
+
+                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                onSuccess()
+            } catch (e: GetCredentialCancellationException) {
+                // User cancelled or dismissed account picker
+                _uiState.update { it.copy(isLoading = false) }
+            } catch (e: Exception) {
+                val raw = e.message.orEmpty()
+                val message = if (raw.contains("16") || raw.contains("cancel", ignoreCase = true)) {
+                    null
+                } else {
+                    mapFirebaseError(e.message)
+                }
+                _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+            }
+        }
+    }
+
+    private fun getWebClientId(context: Context): String {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        return if (resId != 0) {
+            context.getString(resId)
+        } else {
+            "320257622864-97krp9ae7cccp08adcb220lgkqtualmf.apps.googleusercontent.com"
         }
     }
 

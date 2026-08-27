@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +76,7 @@ fun AuthScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     // Handle Snackbar messages
@@ -240,8 +242,10 @@ fun AuthScreen(
             NomadOutlinedButton(
                 text = "Tiếp tục với Google",
                 onClick = {
-                    // Google Sign In triggered (simulate or Credential Manager)
-                    onAuthSuccess()
+                    viewModel.signInWithGoogle(
+                        context = context,
+                        onSuccess = onAuthSuccess,
+                    )
                 },
                 enabled = !uiState.isLoading,
             )
