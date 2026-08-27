@@ -4,54 +4,63 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Vòng phát sáng ngọc mềm nhẹ ở tâm -->
+    <!-- Ánh hào quang xanh ngọc mềm mại sau ví -->
     <path
-        android:pathData="M54,54m-32,0a32,32 0 1,1 64,0a32,32 0 1,1 -64,0"
-        android:fillColor="#1510B981"
-        android:strokeWidth="1.5"
-        android:strokeColor="#3310B981" />
+        android:pathData="M54,56m-34,0a34,34 0 1,1 68,0a34,34 0 1,1 -68,0"
+        android:fillColor="#1810B981" />
 
-    <!-- Vành chính của la bàn -->
+    <!-- 1. Đồng xu vàng tài sản nổi bật -->
     <path
-        android:pathData="M54,54m-24,0a24,24 0 1,1 48,0a24,24 0 1,1 -48,0"
-        android:strokeWidth="2.5"
-        android:strokeColor="#10B981" />
-
-    <!-- 4 Vạch định hướng Đông Tây Nam Bắc -->
+        android:pathData="M70,36m-10,0a10,10 0 1,1 20,0a10,10 0 1,1 -20,0"
+        android:fillColor="#F59E0B" />
     <path
-        android:pathData="M54,23 L54,29 M54,79 L54,85 M23,54 L29,54 M79,54 L85,54"
-        android:strokeWidth="2.5"
-        android:strokeColor="#94A3B8"
+        android:pathData="M70,36m-7.5,0a7.5,7.5 0 1,1 15,0a7.5,7.5 0 1,1 -15,0"
+        android:strokeWidth="1"
+        android:strokeColor="#FDE68A" />
+    <path
+        android:pathData="M70,31 L70,41 M67,33 L72,33 M67,36 L73,36 M67,39 L72,39"
+        android:strokeWidth="1.2"
+        android:strokeColor="#78350F"
         android:strokeLineCap="round" />
 
-    <!-- 4 Điểm phụ Đông Bắc, Tây Bắc, Đông Nam, Tây Nam -->
+    <!-- 2. Thẻ tài chính mạ vàng vươn lên từ trong ví -->
     <path
-        android:pathData="M37,37 L39,39 M71,37 L69,39 M37,71 L39,69 M71,71 L69,69"
-        android:strokeWidth="1.5"
-        android:strokeColor="#64748B"
-        android:strokeLineCap="round" />
+        android:pathData="M32,32 h36 a4,4 0 0 1 4,4 v18 h-44 v-18 a4,4 0 0 1 4,-4 z"
+        android:fillColor="#FBBF24" />
+    <path
+        android:pathData="M32,38 h44 v4 h-44 z"
+        android:fillColor="#D97706" />
+    <path
+        android:pathData="M38,45 h8 v6 h-8 z"
+        android:fillColor="#FEF3C7" />
+    <path
+        android:pathData="M42,45 v6 M38,48 h8"
+        android:strokeWidth="0.8"
+        android:strokeColor="#D97706" />
 
-    <!-- Kim la bàn hướng Bắc (Mũi tên tăng trưởng tài sản - Emerald) -->
+    <!-- 3. Thân ví chính (Deep Navy sang trọng bo góc mềm) -->
     <path
-        android:pathData="M54,30 L60,54 L54,50 Z"
+        android:pathData="M24,48 h60 a6,6 0 0 1 6,6 v26 a8,8 0 0 1 -8,8 h-56 a8,8 0 0 1 -8,-8 v-26 a6,6 0 0 1 6,-6 z"
+        android:fillColor="#1E293B" />
+    <path
+        android:pathData="M24,48 h60 a6,6 0 0 1 6,6 v26 a8,8 0 0 1 -8,8 h-56 a8,8 0 0 1 -8,-8 v-26 a6,6 0 0 1 6,-6 z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#334155" />
+
+    <!-- 4. Nắp gập ví màu Xanh ngọc Emerald biểu trưng dòng tiền thịnh vượng -->
+    <path
+        android:pathData="M24,52 h60 v10 c0,0 -12,12 -30,12 c-18,0 -30,-12 -30,-12 z"
         android:fillColor="#10B981" />
     <path
-        android:pathData="M54,30 L48,54 L54,50 Z"
-        android:fillColor="#059669" />
+        android:pathData="M24,52 h60 v10 c0,0 -12,12 -30,12 c-18,0 -30,-12 -30,-12 z"
+        android:strokeWidth="1.2"
+        android:strokeColor="#34D399" />
 
-    <!-- Kim la bàn hướng Nam (Kỷ luật quản lý chi tiêu - Slate) -->
+    <!-- 5. Khóa cài kim hoàn mạ vàng của ví -->
     <path
-        android:pathData="M54,78 L60,54 L54,58 Z"
-        android:fillColor="#94A3B8" />
+        android:pathData="M50,66 h8 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-8 a4,4 0 0 1 -4,-4 v-4 a4,4 0 0 1 4,-4 z"
+        android:fillColor="#F59E0B" />
     <path
-        android:pathData="M54,78 L48,54 L54,58 Z"
-        android:fillColor="#64748B" />
-
-    <!-- Trục tâm la bàn phát sáng -->
-    <path
-        android:pathData="M54,54m-4.5,0a4.5,4.5 0 1,1 9,0a4.5,4.5 0 1,1 -9,0"
+        android:pathData="M54,72m-1.5,0a1.5,1.5 0 1,1 3,0a1.5,1.5 0 1,1 -3,0"
         android:fillColor="#FFFFFF" />
-    <path
-        android:pathData="M54,54m-2.5,0a2.5,2.5 0 1,1 5,0a2.5,2.5 0 1,1 -5,0"
-        android:fillColor="#10B981" />
 </vector>

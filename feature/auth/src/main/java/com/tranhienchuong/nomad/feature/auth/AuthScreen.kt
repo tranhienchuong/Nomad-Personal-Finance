@@ -23,7 +23,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
@@ -119,7 +119,7 @@ fun AuthScreen(
 
             // Branding Header
             NomadGradientBadge(
-                icon = Icons.Outlined.Explore,
+                icon = Icons.Outlined.AccountBalanceWallet,
                 gradientColors = NomadBrandGradient,
                 size = 72.dp,
                 iconSize = 36.dp,
