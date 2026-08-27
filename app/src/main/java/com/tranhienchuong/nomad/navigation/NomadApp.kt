@@ -10,20 +10,27 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.tranhienchuong.nomad.core.datastore.NomadPreferencesRepository
+import com.tranhienchuong.nomad.core.datastore.nomadDataStore
 import com.tranhienchuong.nomad.core.designsystem.NomadTheme
 import com.tranhienchuong.nomad.feature.auth.AuthScreen
+import com.tranhienchuong.nomad.feature.auth.OnboardingScreen
 import com.tranhienchuong.nomad.feature.budget.BudgetScreen
 import com.tranhienchuong.nomad.feature.home.HomeScreen
 import com.tranhienchuong.nomad.feature.profile.ProfileScreen
 import com.tranhienchuong.nomad.feature.statistics.StatisticsScreen
 import com.tranhienchuong.nomad.feature.transaction.TransactionScreen
+import com.tranhienchuong.nomad.ui.splash.SplashScreen
+import kotlinx.coroutines.launch
 
 private object RootRoute {
     const val Splash = "splash"
@@ -43,6 +50,8 @@ private enum class MainDestination(val route: String, val label: String) {
 @Composable
 fun NomadApp() {
     val rootNavController = rememberNavController()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     NomadTheme {
         NavHost(
@@ -50,46 +59,48 @@ fun NomadApp() {
             startDestination = RootRoute.Splash,
         ) {
             composable(RootRoute.Splash) {
-                TextOnlyScreen(text = "Splash") {
-                    rootNavController.navigate(RootRoute.Onboarding) {
-                        popUpTo(RootRoute.Splash) { inclusive = true }
-                    }
-                }
+                SplashScreen(
+                    onNavigateToMain = {
+                        rootNavController.navigate(RootRoute.Main) {
+                            popUpTo(RootRoute.Splash) { inclusive = true }
+                        }
+                    },
+                    onNavigateToAuth = {
+                        rootNavController.navigate(RootRoute.Auth) {
+                            popUpTo(RootRoute.Splash) { inclusive = true }
+                        }
+                    },
+                    onNavigateToOnboarding = {
+                        rootNavController.navigate(RootRoute.Onboarding) {
+                            popUpTo(RootRoute.Splash) { inclusive = true }
+                        }
+                    },
+                )
             }
             composable(RootRoute.Onboarding) {
-                TextOnlyScreen(text = "Onboarding") {
-                    rootNavController.navigate(RootRoute.Auth) {
-                        popUpTo(RootRoute.Onboarding) { inclusive = true }
-                    }
-                }
+                OnboardingScreen(
+                    onFinished = {
+                        coroutineScope.launch {
+                            val repo = NomadPreferencesRepository(context.nomadDataStore)
+                            repo.setOnboardingCompleted(true)
+                            rootNavController.navigate(RootRoute.Auth) {
+                                popUpTo(RootRoute.Onboarding) { inclusive = true }
+                            }
+                        }
+                    },
+                )
             }
             composable(RootRoute.Auth) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable {
-                            rootNavController.navigate(RootRoute.Main) {
-                                popUpTo(RootRoute.Auth) { inclusive = true }
-                            }
-                        },
-                ) {
-                    AuthScreen()
-                }
+                AuthScreen(
+                    onAuthSuccess = {
+                        rootNavController.navigate(RootRoute.Main) {
+                            popUpTo(RootRoute.Auth) { inclusive = true }
+                        }
+                    },
+                )
             }
             composable(RootRoute.Main) { MainNavigation() }
         }
-    }
-}
-
-@Composable
-private fun TextOnlyScreen(text: String, onContinue: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onContinue),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = text)
     }
 }
 

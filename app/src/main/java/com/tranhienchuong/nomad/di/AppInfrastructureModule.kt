@@ -17,4 +17,9 @@ object AppInfrastructureModule {
     @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> = context.nomadDataStore
+
+    @Provides
+    @Singleton
+    fun provideNomadPreferencesRepository(dataStore: DataStore<Preferences>): com.tranhienchuong.nomad.core.datastore.NomadPreferencesRepository =
+        com.tranhienchuong.nomad.core.datastore.NomadPreferencesRepository(dataStore)
 }
