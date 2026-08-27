@@ -247,6 +247,7 @@ fun AuthScreen(
                         onSuccess = onAuthSuccess,
                     )
                 },
+                isLoading = uiState.isGoogleLoading,
                 enabled = !uiState.isLoading,
             )
 
@@ -382,7 +383,7 @@ private fun SignInForm(
         NomadPrimaryButton(
             text = "Đăng nhập",
             onClick = { viewModel.signIn(onSignInSuccess) },
-            isLoading = uiState.isLoading,
+            isLoading = uiState.isEmailLoading,
         )
     }
 }
@@ -469,7 +470,7 @@ private fun SignUpForm(
         NomadPrimaryButton(
             text = "Tạo tài khoản",
             onClick = { viewModel.signUp(onSignUpSuccess) },
-            isLoading = uiState.isLoading,
+            isLoading = uiState.isEmailLoading,
         )
     }
 }

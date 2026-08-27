@@ -1,6 +1,9 @@
 package com.tranhienchuong.nomad.feature.auth
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
@@ -50,10 +53,19 @@ data class AuthUiState(
     val forgotPasswordSuccessMessage: String? = null,
 
     // General state
-    val isLoading: Boolean = false,
+    val isEmailLoading: Boolean = false,
+    val isGoogleLoading: Boolean = false,
     val errorMessage: String? = null,
     val isAuthenticated: Boolean = false,
-)
+) {
+    val isLoading: Boolean get() = isEmailLoading || isGoogleLoading
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 class AuthViewModel : ViewModel() {
 
@@ -158,22 +170,22 @@ class AuthViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
             val auth = firebaseAuth
             if (auth == null) {
                 // Firebase not yet initialized, simulate successful sign in for demo
-                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
                 onSuccess()
                 return@launch
             }
 
             try {
                 auth.signInWithEmailAndPassword(state.signInEmail.trim(), state.signInPassword).await()
-                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
                 onSuccess()
             } catch (e: Exception) {
                 val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
             }
         }
     }
@@ -203,10 +215,10 @@ class AuthViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
             val auth = firebaseAuth
             if (auth == null) {
-                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
                 onSuccess()
                 return@launch
             }
@@ -218,11 +230,11 @@ class AuthViewModel : ViewModel() {
                 }
                 result.user?.updateProfile(profileUpdates)?.await()
 
-                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
                 onSuccess()
             } catch (e: Exception) {
                 val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
             }
         }
     }
@@ -236,12 +248,12 @@ class AuthViewModel : ViewModel() {
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
             val auth = firebaseAuth
             if (auth == null) {
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
+                        isEmailLoading = false,
                         isForgotPasswordSheetOpen = false,
                         forgotPasswordSuccessMessage = "Liên kết đặt lại mật khẩu đã được gửi đến email!",
                     )
@@ -253,56 +265,71 @@ class AuthViewModel : ViewModel() {
                 auth.sendPasswordResetEmail(state.forgotPasswordEmail.trim()).await()
                 _uiState.update {
                     it.copy(
-                        isLoading = false,
+                        isEmailLoading = false,
                         isForgotPasswordSheetOpen = false,
                         forgotPasswordSuccessMessage = "Liên kết đặt lại mật khẩu đã được gửi đến email!",
                     )
                 }
             } catch (e: Exception) {
                 val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
             }
         }
     }
 
     fun signInWithGoogle(context: Context, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update { it.copy(isGoogleLoading = true, errorMessage = null) }
             try {
-                val credentialManager = CredentialManager.create(context)
+                Log.d("NomadAuth", "1. Start signInWithGoogle")
+                val activity = context.findActivity()
+                Log.d("NomadAuth", "2. Activity resolved: $activity")
+                val targetContext = activity ?: context
+                val credentialManager = CredentialManager.create(targetContext)
                 val webClientId = getWebClientId(context)
+                Log.d("NomadAuth", "3. WebClientId: $webClientId")
 
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
                     .setServerClientId(webClientId)
+                    .setAutoSelectEnabled(false)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
                     .build()
 
-                val result = credentialManager.getCredential(context = context, request = request)
+                Log.d("NomadAuth", "4. Calling credentialManager.getCredential with $targetContext")
+                val result = credentialManager.getCredential(context = targetContext, request = request)
+                Log.d("NomadAuth", "5. Result received: ${result.credential.type}")
+
                 val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
+                Log.d("NomadAuth", "6. Got ID token")
                 val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
 
                 val auth = firebaseAuth
+                Log.d("NomadAuth", "7. FirebaseAuth: $auth")
                 if (auth != null) {
-                    auth.signInWithCredential(firebaseCredential).await()
+                    val authResult = auth.signInWithCredential(firebaseCredential).await()
+                    Log.d("NomadAuth", "8. Firebase sign-in success: ${authResult.user?.email}")
                 }
 
-                _uiState.update { it.copy(isLoading = false, isAuthenticated = true) }
+                _uiState.update { it.copy(isGoogleLoading = false, isAuthenticated = true) }
                 onSuccess()
             } catch (e: GetCredentialCancellationException) {
-                // User cancelled or dismissed account picker
-                _uiState.update { it.copy(isLoading = false) }
-            } catch (e: Exception) {
+                Log.d("NomadAuth", "User cancelled or dismissed: ${e.message}")
+                _uiState.update { it.copy(isGoogleLoading = false) }
+            } catch (e: Throwable) {
+                Log.e("NomadAuth", "Error in signInWithGoogle", e)
                 val raw = e.message.orEmpty()
                 val message = if (raw.contains("16") || raw.contains("cancel", ignoreCase = true)) {
                     null
                 } else {
                     mapFirebaseError(e.message)
                 }
-                _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+                _uiState.update { it.copy(isGoogleLoading = false, errorMessage = message) }
+            } finally {
+                _uiState.update { it.copy(isGoogleLoading = false) }
             }
         }
     }
