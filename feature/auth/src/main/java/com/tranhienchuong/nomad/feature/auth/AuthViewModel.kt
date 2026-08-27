@@ -357,6 +357,8 @@ class AuthViewModel : ViewModel() {
         val msg = rawMessage.orEmpty()
         return when {
             msg.contains("password", ignoreCase = true) -> "Mật khẩu không chính xác hoặc không đủ mạnh."
+            msg.contains("invalid-credential", ignoreCase = true) ||
+                msg.contains("incorrect, malformed or has expired", ignoreCase = true) -> "Thông tin đăng nhập không chính xác hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại."
             msg.contains("user-not-found", ignoreCase = true) || msg.contains("no user", ignoreCase = true) -> "Tài khoản không tồn tại trong hệ thống."
             msg.contains("email-already-in-use", ignoreCase = true) -> "Email này đã được sử dụng cho một tài khoản khác."
             msg.contains("network", ignoreCase = true) -> "Không thể kết nối mạng. Vui lòng kiểm tra lại kết nối internet."
