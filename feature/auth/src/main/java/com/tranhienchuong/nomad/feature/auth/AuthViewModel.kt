@@ -10,7 +10,10 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
@@ -289,18 +292,17 @@ class AuthViewModel : ViewModel() {
                 val webClientId = getWebClientId(context)
                 Log.d("NomadAuth", "3. WebClientId: $webClientId")
 
-                val googleIdOption = GetGoogleIdOption.Builder()
-                    .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(webClientId)
-                    .setAutoSelectEnabled(false)
+                val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(serverClientId = webClientId)
                     .build()
 
                 val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(googleIdOption)
+                    .addCredentialOption(signInWithGoogleOption)
                     .build()
 
-                Log.d("NomadAuth", "4. Calling credentialManager.getCredential with $targetContext")
-                val result = credentialManager.getCredential(context = targetContext, request = request)
+                Log.d("NomadAuth", "4. Calling credentialManager.getCredential with GetSignInWithGoogleOption")
+                val result = withTimeout(25_000L) {
+                    credentialManager.getCredential(context = targetContext, request = request)
+                }
                 Log.d("NomadAuth", "5. Result received: ${result.credential.type}")
 
                 val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
@@ -319,6 +321,14 @@ class AuthViewModel : ViewModel() {
             } catch (e: GetCredentialCancellationException) {
                 Log.d("NomadAuth", "User cancelled or dismissed: ${e.message}")
                 _uiState.update { it.copy(isGoogleLoading = false) }
+            } catch (e: TimeoutCancellationException) {
+                Log.w("NomadAuth", "Timeout waiting for Google Credential Picker")
+                _uiState.update {
+                    it.copy(
+                        isGoogleLoading = false,
+                        errorMessage = "Hết thời gian chờ phản hồi từ Google. Vui lòng kiểm tra kết nối mạng và thử lại.",
+                    )
+                }
             } catch (e: Throwable) {
                 Log.e("NomadAuth", "Error in signInWithGoogle", e)
                 val raw = e.message.orEmpty()
