@@ -11,6 +11,17 @@ if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
 
+tasks.register("verifyReleaseFirebaseConfig") {
+    group = "verification"
+    description = "Fails release builds that do not contain the Firebase configuration file."
+    inputs.file(layout.projectDirectory.file("google-services.json"))
+    doLast {
+        check(inputs.files.singleFile.isFile) {
+            "Release builds require app/google-services.json. Supply it securely in CI."
+        }
+    }
+}
+
 android {
     namespace = "com.tranhienchuong.nomad"
     compileSdk {
@@ -45,7 +56,13 @@ android {
     }
 }
 
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn("verifyReleaseFirebaseConfig")
+}
+
 dependencies {
+    implementation(project(":core:auth"))
+    implementation(project(":core:auth-firebase"))
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
     implementation(project(":core:designsystem"))
@@ -65,6 +82,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.credentials)
@@ -73,7 +91,6 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.crashlytics)
     testImplementation(libs.junit)

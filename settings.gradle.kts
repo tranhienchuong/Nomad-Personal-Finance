@@ -26,6 +26,8 @@ dependencyResolutionManagement {
 rootProject.name = "Nomad"
 include(":app")
 include(":core:common")
+include(":core:auth")
+include(":core:auth-firebase")
 include(":core:designsystem")
 include(":core:database")
 include(":core:datastore")

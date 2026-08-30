@@ -16,23 +16,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.FirebaseApp
-import com.google.firebase.auth.FirebaseAuth
-import com.tranhienchuong.nomad.core.datastore.NomadPreferencesRepository
-import com.tranhienchuong.nomad.core.datastore.nomadDataStore
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tranhienchuong.nomad.core.designsystem.NomadBrandGradient
 import com.tranhienchuong.nomad.core.designsystem.NomadGradientBadge
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 
 @Composable
 fun SplashScreen(
@@ -40,13 +37,13 @@ fun SplashScreen(
     onNavigateToAuth: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: SplashViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
     val scale = remember { Animatable(0.7f) }
     val alpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Run animation concurrently with startup checks
         scale.animateTo(
             targetValue = 1f,
             animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
@@ -61,32 +58,16 @@ fun SplashScreen(
     }
 
     LaunchedEffect(Unit) {
-        delay(1200) // Ensure splash brand presentation (1.2s)
+        delay(1200)
+        viewModel.resolveDestination()
+    }
 
-        val isAuthenticated = try {
-            if (FirebaseApp.getApps(context).isNotEmpty()) {
-                FirebaseAuth.getInstance().currentUser != null
-            } else false
-        } catch (_: Exception) {
-            false
-        }
-
-        if (isAuthenticated) {
-            onNavigateToMain()
-            return@LaunchedEffect
-        }
-
-        val repo = NomadPreferencesRepository(context.nomadDataStore)
-        val isOnboardingCompleted = try {
-            repo.isOnboardingCompleted.first()
-        } catch (_: Exception) {
-            false
-        }
-
-        if (isOnboardingCompleted) {
-            onNavigateToAuth()
-        } else {
-            onNavigateToOnboarding()
+    LaunchedEffect(uiState.destination) {
+        when (uiState.destination) {
+            StartupDestination.Main -> onNavigateToMain()
+            StartupDestination.Auth -> onNavigateToAuth()
+            StartupDestination.Onboarding -> onNavigateToOnboarding()
+            null -> Unit
         }
     }
 

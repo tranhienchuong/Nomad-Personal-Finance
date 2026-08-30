@@ -59,7 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tranhienchuong.nomad.core.designsystem.NomadBrandGradient
 import com.tranhienchuong.nomad.core.designsystem.NomadGradientBadge
 import com.tranhienchuong.nomad.core.designsystem.NomadOutlinedButton
@@ -70,7 +70,7 @@ import com.tranhienchuong.nomad.core.designsystem.NomadTextField
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit = {},
-    viewModel: AuthViewModel = viewModel(),
+    viewModel: AuthViewModel = hiltViewModel(),
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -78,6 +78,21 @@ fun AuthScreen(
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                AuthEffect.NavigateToMain -> onAuthSuccess()
+                AuthEffect.RequestGoogleSignIn -> {
+                    when (val result = requestGoogleIdToken(context)) {
+                        is GoogleCredentialResult.Success -> viewModel.signInWithGoogle(result.idToken)
+                        GoogleCredentialResult.Cancelled -> viewModel.onGoogleSignInCancelled()
+                        is GoogleCredentialResult.Failure -> viewModel.showGoogleSignInError(result.message)
+                    }
+                }
+            }
+        }
+    }
 
     // Handle Snackbar messages
     LaunchedEffect(uiState.errorMessage) {
@@ -190,11 +205,10 @@ fun AuthScreen(
                         SignInForm(
                             uiState = uiState,
                             viewModel = viewModel,
-                            onSignInSuccess = onAuthSuccess,
                             onNext = { focusManager.moveFocus(FocusDirection.Down) },
                             onDone = {
                                 focusManager.clearFocus()
-                                viewModel.signIn(onSuccess = onAuthSuccess)
+                                viewModel.signIn()
                             },
                         )
                     }
@@ -202,11 +216,10 @@ fun AuthScreen(
                         SignUpForm(
                             uiState = uiState,
                             viewModel = viewModel,
-                            onSignUpSuccess = onAuthSuccess,
                             onNext = { focusManager.moveFocus(FocusDirection.Down) },
                             onDone = {
                                 focusManager.clearFocus()
-                                viewModel.signUp(onSuccess = onAuthSuccess)
+                                viewModel.signUp()
                             },
                         )
                     }
@@ -241,12 +254,7 @@ fun AuthScreen(
             // Google Sign In Button
             NomadOutlinedButton(
                 text = "Tiếp tục với Google",
-                onClick = {
-                    viewModel.signInWithGoogle(
-                        context = context,
-                        onSuccess = onAuthSuccess,
-                    )
-                },
+                onClick = viewModel::requestGoogleSignIn,
                 isLoading = uiState.isGoogleLoading,
                 enabled = !uiState.isLoading,
             )
@@ -321,7 +329,6 @@ fun AuthScreen(
 private fun SignInForm(
     uiState: AuthUiState,
     viewModel: AuthViewModel,
-    onSignInSuccess: () -> Unit,
     onNext: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -382,7 +389,7 @@ private fun SignInForm(
 
         NomadPrimaryButton(
             text = "Đăng nhập",
-            onClick = { viewModel.signIn(onSignInSuccess) },
+            onClick = viewModel::signIn,
             isLoading = uiState.isEmailLoading,
         )
     }
@@ -392,7 +399,6 @@ private fun SignInForm(
 private fun SignUpForm(
     uiState: AuthUiState,
     viewModel: AuthViewModel,
-    onSignUpSuccess: () -> Unit,
     onNext: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -469,7 +475,7 @@ private fun SignUpForm(
 
         NomadPrimaryButton(
             text = "Tạo tài khoản",
-            onClick = { viewModel.signUp(onSignUpSuccess) },
+            onClick = viewModel::signUp,
             isLoading = uiState.isEmailLoading,
         )
     }

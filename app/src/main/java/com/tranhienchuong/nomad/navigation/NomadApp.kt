@@ -10,17 +10,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.tranhienchuong.nomad.core.datastore.NomadPreferencesRepository
-import com.tranhienchuong.nomad.core.datastore.nomadDataStore
 import com.tranhienchuong.nomad.core.designsystem.NomadTheme
 import com.tranhienchuong.nomad.feature.auth.AuthScreen
 import com.tranhienchuong.nomad.feature.auth.OnboardingScreen
@@ -30,7 +26,6 @@ import com.tranhienchuong.nomad.feature.profile.ProfileScreen
 import com.tranhienchuong.nomad.feature.statistics.StatisticsScreen
 import com.tranhienchuong.nomad.feature.transaction.TransactionScreen
 import com.tranhienchuong.nomad.ui.splash.SplashScreen
-import kotlinx.coroutines.launch
 
 private object RootRoute {
     const val Splash = "splash"
@@ -50,8 +45,6 @@ private enum class MainDestination(val route: String, val label: String) {
 @Composable
 fun NomadApp() {
     val rootNavController = rememberNavController()
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     NomadTheme {
         NavHost(
@@ -80,12 +73,8 @@ fun NomadApp() {
             composable(RootRoute.Onboarding) {
                 OnboardingScreen(
                     onFinished = {
-                        coroutineScope.launch {
-                            val repo = NomadPreferencesRepository(context.nomadDataStore)
-                            repo.setOnboardingCompleted(true)
-                            rootNavController.navigate(RootRoute.Auth) {
-                                popUpTo(RootRoute.Onboarding) { inclusive = true }
-                            }
+                        rootNavController.navigate(RootRoute.Auth) {
+                            popUpTo(RootRoute.Onboarding) { inclusive = true }
                         }
                     },
                 )

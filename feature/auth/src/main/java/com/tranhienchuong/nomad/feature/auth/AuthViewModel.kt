@@ -1,29 +1,19 @@
 package com.tranhienchuong.nomad.feature.auth
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.util.Log
-import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
-import com.google.firebase.FirebaseApp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.firebase.auth.userProfileChangeRequest
+import com.tranhienchuong.nomad.core.auth.AuthFailure
+import com.tranhienchuong.nomad.core.auth.AuthRepository
+import com.tranhienchuong.nomad.core.auth.AuthResult
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 enum class AuthTab {
     SignIn,
@@ -59,31 +49,26 @@ data class AuthUiState(
     val isEmailLoading: Boolean = false,
     val isGoogleLoading: Boolean = false,
     val errorMessage: String? = null,
-    val isAuthenticated: Boolean = false,
 ) {
     val isLoading: Boolean get() = isEmailLoading || isGoogleLoading
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
+sealed interface AuthEffect {
+    data object NavigateToMain : AuthEffect
+
+    data object RequestGoogleSignIn : AuthEffect
 }
 
-class AuthViewModel : ViewModel() {
+@HiltViewModel
+class AuthViewModel @Inject constructor(
+    private val authRepository: AuthRepository,
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val firebaseAuth: FirebaseAuth? by lazy {
-        try {
-            if (FirebaseApp.getApps(FirebaseApp.getInstance().applicationContext).isNotEmpty()) {
-                FirebaseAuth.getInstance()
-            } else null
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private val _effects = Channel<AuthEffect>(capacity = Channel.BUFFERED)
+    val effects = _effects.receiveAsFlow()
 
     fun selectTab(tab: AuthTab) {
         _uiState.update { it.copy(selectedTab = tab, errorMessage = null) }
@@ -92,49 +77,63 @@ class AuthViewModel : ViewModel() {
     fun onSignInEmailChanged(email: String) {
         val error = if (_uiState.value.signInEmailError != null) {
             AuthValidators.validateEmail(email).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signInEmail = email, signInEmailError = error) }
     }
 
     fun onSignInPasswordChanged(password: String) {
         val error = if (_uiState.value.signInPasswordError != null) {
             AuthValidators.validatePassword(password).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signInPassword = password, signInPasswordError = error) }
     }
 
     fun onSignUpFullNameChanged(fullName: String) {
         val error = if (_uiState.value.signUpFullNameError != null) {
             AuthValidators.validateFullName(fullName).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signUpFullName = fullName, signUpFullNameError = error) }
     }
 
     fun onSignUpEmailChanged(email: String) {
         val error = if (_uiState.value.signUpEmailError != null) {
             AuthValidators.validateEmail(email).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signUpEmail = email, signUpEmailError = error) }
     }
 
     fun onSignUpPasswordChanged(password: String) {
         val error = if (_uiState.value.signUpPasswordError != null) {
             AuthValidators.validatePassword(password).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signUpPassword = password, signUpPasswordError = error) }
     }
 
     fun onSignUpConfirmPasswordChanged(confirmPassword: String) {
         val error = if (_uiState.value.signUpConfirmPasswordError != null) {
             AuthValidators.validateConfirmPassword(_uiState.value.signUpPassword, confirmPassword).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(signUpConfirmPassword = confirmPassword, signUpConfirmPasswordError = error) }
     }
 
     fun onForgotPasswordEmailChanged(email: String) {
         val error = if (_uiState.value.forgotPasswordEmailError != null) {
             AuthValidators.validateEmail(email).errorMessage
-        } else null
+        } else {
+            null
+        }
         _uiState.update { it.copy(forgotPasswordEmail = email, forgotPasswordEmailError = error) }
     }
 
@@ -157,7 +156,9 @@ class AuthViewModel : ViewModel() {
         _uiState.update { it.copy(forgotPasswordSuccessMessage = null) }
     }
 
-    fun signIn(onSuccess: () -> Unit) {
+    fun signIn() {
+        if (_uiState.value.isLoading) return
+
         val state = _uiState.value
         val emailValidation = AuthValidators.validateEmail(state.signInEmail)
         val passwordValidation = AuthValidators.validatePassword(state.signInPassword)
@@ -174,26 +175,16 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
-            val auth = firebaseAuth
-            if (auth == null) {
-                // Firebase not yet initialized, simulate successful sign in for demo
-                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
-                onSuccess()
-                return@launch
-            }
-
-            try {
-                auth.signInWithEmailAndPassword(state.signInEmail.trim(), state.signInPassword).await()
-                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
-                onSuccess()
-            } catch (e: Exception) {
-                val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
+            when (val result = safely { authRepository.signIn(state.signInEmail.trim(), state.signInPassword) }) {
+                is AuthResult.Success -> completeAuthentication()
+                is AuthResult.Failure -> showFailure(result.error, isGoogle = false)
             }
         }
     }
 
-    fun signUp(onSuccess: () -> Unit) {
+    fun signUp() {
+        if (_uiState.value.isLoading) return
+
         val state = _uiState.value
         val nameValidation = AuthValidators.validateFullName(state.signUpFullName)
         val emailValidation = AuthValidators.validateEmail(state.signUpEmail)
@@ -219,30 +210,24 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
-            val auth = firebaseAuth
-            if (auth == null) {
-                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
-                onSuccess()
-                return@launch
-            }
-
-            try {
-                val result = auth.createUserWithEmailAndPassword(state.signUpEmail.trim(), state.signUpPassword).await()
-                val profileUpdates = userProfileChangeRequest {
-                    displayName = state.signUpFullName.trim()
+            when (
+                val result = safely {
+                    authRepository.signUp(
+                        displayName = state.signUpFullName.trim(),
+                        email = state.signUpEmail.trim(),
+                        password = state.signUpPassword,
+                    )
                 }
-                result.user?.updateProfile(profileUpdates)?.await()
-
-                _uiState.update { it.copy(isEmailLoading = false, isAuthenticated = true) }
-                onSuccess()
-            } catch (e: Exception) {
-                val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
+            ) {
+                is AuthResult.Success -> completeAuthentication()
+                is AuthResult.Failure -> showFailure(result.error, isGoogle = false)
             }
         }
     }
 
     fun sendPasswordReset() {
+        if (_uiState.value.isLoading) return
+
         val state = _uiState.value
         val emailValidation = AuthValidators.validateEmail(state.forgotPasswordEmail)
         if (!emailValidation.isValid) {
@@ -252,117 +237,81 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             _uiState.update { it.copy(isEmailLoading = true, errorMessage = null) }
-            val auth = firebaseAuth
-            if (auth == null) {
-                _uiState.update {
-                    it.copy(
-                        isEmailLoading = false,
-                        isForgotPasswordSheetOpen = false,
-                        forgotPasswordSuccessMessage = "Liên kết đặt lại mật khẩu đã được gửi đến email!",
-                    )
+            when (val result = safely { authRepository.sendPasswordReset(state.forgotPasswordEmail.trim()) }) {
+                is AuthResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isEmailLoading = false,
+                            isForgotPasswordSheetOpen = false,
+                            forgotPasswordSuccessMessage = "Liên kết đặt lại mật khẩu đã được gửi đến email!",
+                        )
+                    }
                 }
-                return@launch
-            }
-
-            try {
-                auth.sendPasswordResetEmail(state.forgotPasswordEmail.trim()).await()
-                _uiState.update {
-                    it.copy(
-                        isEmailLoading = false,
-                        isForgotPasswordSheetOpen = false,
-                        forgotPasswordSuccessMessage = "Liên kết đặt lại mật khẩu đã được gửi đến email!",
-                    )
-                }
-            } catch (e: Exception) {
-                val message = mapFirebaseError(e.message)
-                _uiState.update { it.copy(isEmailLoading = false, errorMessage = message) }
+                is AuthResult.Failure -> showFailure(result.error, isGoogle = false)
             }
         }
     }
 
-    fun signInWithGoogle(context: Context, onSuccess: () -> Unit) {
+    fun requestGoogleSignIn() {
+        if (_uiState.value.isLoading) return
+
+        _uiState.update { it.copy(isGoogleLoading = true, errorMessage = null) }
+        _effects.trySend(AuthEffect.RequestGoogleSignIn)
+    }
+
+    fun signInWithGoogle(idToken: String) {
+        if (_uiState.value.isEmailLoading) return
+
         viewModelScope.launch {
             _uiState.update { it.copy(isGoogleLoading = true, errorMessage = null) }
-            try {
-                Log.d("NomadAuth", "1. Start signInWithGoogle")
-                val activity = context.findActivity()
-                Log.d("NomadAuth", "2. Activity resolved: $activity")
-                val targetContext = activity ?: context
-                val credentialManager = CredentialManager.create(targetContext)
-                val webClientId = getWebClientId(context)
-                Log.d("NomadAuth", "3. WebClientId: $webClientId")
-
-                val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(serverClientId = webClientId)
-                    .build()
-
-                val request = GetCredentialRequest.Builder()
-                    .addCredentialOption(signInWithGoogleOption)
-                    .build()
-
-                Log.d("NomadAuth", "4. Calling credentialManager.getCredential with GetSignInWithGoogleOption")
-                val result = withTimeout(25_000L) {
-                    credentialManager.getCredential(context = targetContext, request = request)
-                }
-                Log.d("NomadAuth", "5. Result received: ${result.credential.type}")
-
-                val googleIdToken = GoogleIdTokenCredential.createFrom(result.credential.data).idToken
-                Log.d("NomadAuth", "6. Got ID token")
-                val firebaseCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-
-                val auth = firebaseAuth
-                Log.d("NomadAuth", "7. FirebaseAuth: $auth")
-                if (auth != null) {
-                    val authResult = auth.signInWithCredential(firebaseCredential).await()
-                    Log.d("NomadAuth", "8. Firebase sign-in success: ${authResult.user?.email}")
-                }
-
-                _uiState.update { it.copy(isGoogleLoading = false, isAuthenticated = true) }
-                onSuccess()
-            } catch (e: GetCredentialCancellationException) {
-                Log.d("NomadAuth", "User cancelled or dismissed: ${e.message}")
-                _uiState.update { it.copy(isGoogleLoading = false) }
-            } catch (e: TimeoutCancellationException) {
-                Log.w("NomadAuth", "Timeout waiting for Google Credential Picker")
-                _uiState.update {
-                    it.copy(
-                        isGoogleLoading = false,
-                        errorMessage = "Hết thời gian chờ phản hồi từ Google. Vui lòng kiểm tra kết nối mạng và thử lại.",
-                    )
-                }
-            } catch (e: Throwable) {
-                Log.e("NomadAuth", "Error in signInWithGoogle", e)
-                val raw = e.message.orEmpty()
-                val message = if (raw.contains("16") || raw.contains("cancel", ignoreCase = true)) {
-                    null
-                } else {
-                    mapFirebaseError(e.message)
-                }
-                _uiState.update { it.copy(isGoogleLoading = false, errorMessage = message) }
-            } finally {
-                _uiState.update { it.copy(isGoogleLoading = false) }
+            when (val result = safely { authRepository.signInWithGoogle(idToken) }) {
+                is AuthResult.Success -> completeAuthentication()
+                is AuthResult.Failure -> showFailure(result.error, isGoogle = true)
             }
         }
     }
 
-    private fun getWebClientId(context: Context): String {
-        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-        return if (resId != 0) {
-            context.getString(resId)
-        } else {
-            "320257622864-97krp9ae7cccp08adcb220lgkqtualmf.apps.googleusercontent.com"
-        }
+    fun showGoogleSignInError(message: String) {
+        _uiState.update { it.copy(isGoogleLoading = false, errorMessage = message) }
     }
 
-    private fun mapFirebaseError(rawMessage: String?): String {
-        val msg = rawMessage.orEmpty()
-        return when {
-            msg.contains("password", ignoreCase = true) -> "Mật khẩu không chính xác hoặc không đủ mạnh."
-            msg.contains("invalid-credential", ignoreCase = true) ||
-                msg.contains("incorrect, malformed or has expired", ignoreCase = true) -> "Thông tin đăng nhập không chính xác hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại."
-            msg.contains("user-not-found", ignoreCase = true) || msg.contains("no user", ignoreCase = true) -> "Tài khoản không tồn tại trong hệ thống."
-            msg.contains("email-already-in-use", ignoreCase = true) -> "Email này đã được sử dụng cho một tài khoản khác."
-            msg.contains("network", ignoreCase = true) -> "Không thể kết nối mạng. Vui lòng kiểm tra lại kết nối internet."
-            else -> "Đã có lỗi xảy ra: ${msg.ifBlank { "Vui lòng thử lại sau" }}"
+    fun onGoogleSignInCancelled() {
+        _uiState.update { it.copy(isGoogleLoading = false) }
+    }
+
+    private suspend fun <T> safely(block: suspend () -> AuthResult<T>): AuthResult<T> = try {
+        block()
+    } catch (_: Exception) {
+        AuthResult.Failure(AuthFailure.Unknown)
+    }
+
+    private suspend fun completeAuthentication() {
+        _uiState.update {
+            it.copy(
+                isEmailLoading = false,
+                isGoogleLoading = false,
+            )
+        }
+        _effects.send(AuthEffect.NavigateToMain)
+    }
+
+    private fun showFailure(failure: AuthFailure, isGoogle: Boolean) {
+        _uiState.update {
+            it.copy(
+                isEmailLoading = if (isGoogle) it.isEmailLoading else false,
+                isGoogleLoading = if (isGoogle) false else it.isGoogleLoading,
+                errorMessage = failure.toMessage(),
+            )
         }
     }
+}
+
+private fun AuthFailure.toMessage(): String = when (this) {
+    AuthFailure.InvalidCredential -> "Thông tin đăng nhập không chính xác hoặc đã hết hạn."
+    AuthFailure.UserNotFound -> "Tài khoản không tồn tại trong hệ thống."
+    AuthFailure.EmailAlreadyInUse -> "Email này đã được sử dụng cho một tài khoản khác."
+    AuthFailure.WeakPassword -> "Mật khẩu không đủ mạnh. Vui lòng dùng ít nhất 6 ký tự."
+    AuthFailure.NetworkUnavailable -> "Không thể kết nối mạng. Vui lòng kiểm tra Internet và thử lại."
+    AuthFailure.ServiceUnavailable -> "Dịch vụ xác thực hiện chưa sẵn sàng. Vui lòng thử lại sau."
+    AuthFailure.Unknown -> "Đã có lỗi xảy ra. Vui lòng thử lại sau."
 }

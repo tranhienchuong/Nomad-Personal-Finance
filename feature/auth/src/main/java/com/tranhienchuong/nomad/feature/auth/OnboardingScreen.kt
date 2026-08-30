@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tranhienchuong.nomad.core.designsystem.NomadBadgeGradient1
 import com.tranhienchuong.nomad.core.designsystem.NomadBadgeGradient2
 import com.tranhienchuong.nomad.core.designsystem.NomadBadgeGradient3
@@ -78,9 +80,18 @@ private val OnboardingPages = listOf(
 fun OnboardingScreen(
     onFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val pagerState = rememberPagerState(pageCount = { OnboardingPages.size })
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                OnboardingEffect.NavigateToAuth -> onFinished()
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -99,7 +110,7 @@ fun OnboardingScreen(
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (pagerState.currentPage < OnboardingPages.size - 1) {
-                    TextButton(onClick = onFinished) {
+                    TextButton(onClick = viewModel::finishOnboarding) {
                         Text(
                             text = "Bỏ qua",
                             style = MaterialTheme.typography.bodyMedium.copy(
@@ -204,7 +215,7 @@ fun OnboardingScreen(
                     text = if (isLastPage) "Bắt đầu ngay" else "Tiếp tục",
                     onClick = {
                         if (isLastPage) {
-                            onFinished()
+                            viewModel.finishOnboarding()
                         } else {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
